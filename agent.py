@@ -37,10 +37,22 @@ class SalesCallAgent:
                 You are an expert AI sales assistant. Analyze the following sales call transcription and:
                 1. Provide a concise executive summary
                 2. Extract a list of specific action items
-                3. If a meeting/demo/follow-up is needed, schedule it using the Calendar tool (always provide the date and time in ISO 8601 format, e.g., 2025-06-26T14:00:00)
+                3. If a meeting/demo/follow-up is mentioned or needed:
+                   - ALWAYS use the Calendar tool to schedule it
+                   - Format the date and time EXACTLY like this: 2025-06-26T14:00:00
+                   - Include a clear summary of what the meeting is about
+                   - Example Calendar tool usage: schedule_event("Sales Demo Follow-up", "2025-06-26T14:00:00")
                 4. If a competitor, product, or market trend is mentioned, use the Web Search tool to find relevant info
 
-                IMPORTANT: If you use the Web Search tool, you MUST include the search results (the Observation) in the 'Web Search' section of your final answer. Format the 'Web Search' section as a list of links and short descriptions.
+                IMPORTANT CALENDAR INSTRUCTIONS:
+                - If any meeting, demo, or follow-up is discussed, you MUST schedule it
+                - Always use ISO 8601 format for dates (YYYY-MM-DDTHH:MM:SS)
+                - The Calendar section of your response should only contain the result from the Calendar tool
+                - Do not include any other text in the Calendar section
+
+                IMPORTANT WEB SEARCH INSTRUCTIONS:
+                - If you use the Web Search tool, include the search results in the 'Web Search' section
+                - Format the 'Web Search' section as a list of links and short descriptions
 
                 Return your results in this format:
                 Executive Summary: ...
@@ -52,35 +64,43 @@ class SalesCallAgent:
                 """ + transcription
             )
             result = self.agent.run(prompt)
-            # The result is a string; parse it into a dict for the UI
+            
+            # Parse the result into sections
             output = {"summary": "", "action_items": [], "calendar": "", "web_search": ""}
-            # Simple parsing based on section headers
+            
+            # Parse each section
             for section in ["Executive Summary", "Action Items", "Calendar", "Web Search"]:
                 if section in result:
+                    # Split by section and get the content
                     part = result.split(section + ":", 1)[1]
-                    next_section = [s for s in ["Executive Summary", "Action Items", "Calendar", "Web Search"] if s != section and s+":" in part]
+                    # Find the next section to get the boundary
+                    next_section = [s for s in ["Executive Summary", "Action Items", "Calendar", "Web Search"] 
+                                  if s != section and s+":" in part]
                     if next_section:
                         part = part.split(next_section[0] + ":", 1)[0]
                     part = part.strip()
+                    
+                    # Handle action items as a list
                     if section == "Action Items":
-                        output["action_items"] = [item.strip("- ") for item in part.split("\n") if item.strip()]
+                        items = [item.strip("- ") for item in part.split("\n") if item.strip()]
+                        output["action_items"] = items
                     else:
                         output[section.lower().replace(" ", "_")] = part
-            # --- Calendar tool integration: actually schedule the event if needed ---
-            cal = output.get("calendar", "")
-            # If the calendar output is not a link and looks like a scheduling instruction, try to extract and schedule
-            if cal and ("scheduled" in cal.lower() or "schedule" in cal.lower()) and "http" not in cal:
-                # Try to extract ISO date/time
-                match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", cal)
-                if match:
-                    start_time = match.group(1)
-                    # Use the rest as summary
-                    summary = re.sub(r".*for \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.*", "", cal)
-                    if not summary.strip():
-                        summary = cal.split("for")[0].strip()
-                    # Actually schedule the event
+
+            # Additional calendar processing if needed
+            cal_output = output.get("calendar", "")
+            if cal_output and "Event created:" not in cal_output and "http" not in cal_output:
+                # Try to extract date and summary
+                date_match = re.search(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", cal_output)
+                if date_match:
+                    start_time = date_match.group(1)
+                    summary = cal_output.split(start_time)[0].strip()
+                    if not summary:
+                        summary = "Follow-up Meeting"
+                    # Schedule the event
                     cal_result = schedule_event(summary, start_time)
                     output["calendar"] = cal_result
+
             return output
         except Exception as e:
             raise Exception(f"Failed to process transcription with agent: {str(e)}") 
