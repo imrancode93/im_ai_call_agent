@@ -1,0 +1,21 @@
+langchain
+langchain-core
+langchain-community
+langchain-openai
+openai
+streamlit==1.31.1
+python-dotenv==1.0.1
+python-docx
+nltk
+PyPDF2
+# For tools
+google-search-results==2.4.2
+google-auth==2.29.0
+google-auth-oauthlib==1.2.0
+google-api-python-client==2.126.0
+pydub==0.25.1
+whisper==1.1.10
+torch==2.2.1
+numpy==1.26.4
+pandas==2.2.1
+dateparser 
